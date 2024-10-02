@@ -42,15 +42,16 @@ def echo_request(event):
     return echo
 
 
-def fetchone_to_dict(cursor):
-    col_names = [col[0] for col in cursor.description]
-    row = cursor.fetchone()
+def fetchone_to_dict(result):
+    col_names = result.keys()
+    row = result.fetchone()
     return dict(zip(col_names, row)) if row else None
 
 
-def fetchall_to_dict(cursor):
-    col_names = [col[0] for col in cursor.description]
-    return [dict(zip(col_names, row)) for row in cursor]
+def fetchall_to_dict(result):
+    col_names = result.keys()
+    data = result.fetchall()
+    return [dict(zip(col_names, row)) for row in data]
 
 
 def _to_json(obj):
@@ -201,7 +202,7 @@ def iam(event):
 def check_tenant(tenant_code, DB):
     sql = """
         INSERT INTO tenant (code)
-        VALUES (%(tenant_code)s)
+        VALUES (:tenant_code)
         ON CONFLICT (code) DO UPDATE 
         SET code = EXCLUDED.code
         RETURNING id
