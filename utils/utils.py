@@ -199,7 +199,7 @@ def iam(event):
     return tenant_code
 
 
-def check_tenant(tenant_code, DB):
+async def check_tenant(tenant_code, DB):
     sql = """
         INSERT INTO tenant (code)
         VALUES (:tenant_code)
@@ -208,9 +208,9 @@ def check_tenant(tenant_code, DB):
         RETURNING id
     """
 
-    with DB.connect() as conn:
-        conn.execute(sql, {"tenant_code": tenant_code})
-        return fetchone_to_dict(conn)
+    async with DB.begin() as conn:
+        result =await conn.execute(sql, {"tenant_code": tenant_code})
+        return fetchone_to_dict(result)
 
 
 async def parse_event(request):
