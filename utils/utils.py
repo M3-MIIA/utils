@@ -7,6 +7,8 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from mangum import Mangum
 
+from sqlalchemy import text
+
 TENANT_REGEX_PRD = re.compile(r"https://(?P<tenant>.+).miia.tech")
 TENANT_REGEX_HML = re.compile(r"https://.*--m3par-miia.netlify.app")
 
@@ -209,7 +211,7 @@ async def check_tenant(tenant_code, DB):
     """
 
     async with DB.begin() as conn:
-        result =await conn.execute(sql, {"tenant_code": tenant_code})
+        result = await conn.execute(text(sql), {"tenant_code": tenant_code})
         return fetchone_to_dict(result)
 
 
