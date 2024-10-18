@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from mangum import Mangum
 
 from sqlalchemy import text
+from botocore.exceptions import ClientError
 
 TENANT_REGEX_PRD = re.compile(r"https://(?P<tenant>.+).miia.tech")
 TENANT_REGEX_HML = re.compile(r"https://.*--m3par-miia.netlify.app")
@@ -223,3 +224,11 @@ async def parse_event(request):
         "pathParameters": dict(request.path_params),
         "method": request.method,
     }
+
+
+def get_secret_key(aws_client, secret_name):
+    try:
+        return aws_client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        logging.error(f"Erro ao obter o valor do secreto {secret_name}: {e}")
+        return

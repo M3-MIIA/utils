@@ -12,6 +12,7 @@ setup(
         'SQLAlchemy',
         'fastapi',
         'mangum',
+        'botocore'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
