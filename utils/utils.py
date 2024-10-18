@@ -145,7 +145,8 @@ def parse_body(body):
         body = json.loads(body)
         return body
     except json.JSONDecodeError as e:
-        raise HTTPException(400, "Invalid request body format", details=str(e))
+        logging.error(str(e))
+        raise HTTPException(400, detail={"message":"Invalid request body format","error_code":"bad_request_body_format"})
 
 
 def handle_param_id(param_id):
