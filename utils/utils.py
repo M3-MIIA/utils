@@ -227,9 +227,9 @@ async def parse_event(request):
     }
 
 
-def get_secret_key(aws_client, secret_name):
+def get_secret_key(aws_client, secret_name, key_name):
     try:
-        return aws_client.get_secret_value(SecretId=secret_name)
+        return aws_client.get_secret_value(SecretId=secret_name).get(key_name)
     except ClientError as e:
         logging.error(f"Erro ao obter o valor do secreto {secret_name}: {e}")
         return
