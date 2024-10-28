@@ -57,7 +57,7 @@ def fetchall_to_dict(result):
     return [dict(zip(col_names, row)) for row in data]
 
 
-def _to_json(obj):
+def to_json(obj):
     if isinstance(obj, (date, datetime, time)):
         return obj.isoformat()
     if isinstance(obj, Decimal):
@@ -73,7 +73,7 @@ def make_response(status_code, body=None):
 
     if body:
         headers["Content-Type"] = "application/json"
-        response["body"] = json.dumps(body, default=_to_json)
+        response["body"] = json.dumps(body, default=to_json)
 
     return response
 
