@@ -218,13 +218,15 @@ async def check_tenant(tenant_code, DB):
 
 
 async def parse_event(request):
-    return {
-        "headers": dict(request.headers),
-        "body": await request.body(),
-        "queryParameters": dict(request.query_params),
-        "pathParameters": dict(request.path_params),
-        "method": request.method,
-    }
+    if IS_LOCAL:
+        return {
+            "headers": dict(request.headers),
+            "body": await request.body(),
+            "queryStringParameters": dict(request.query_params),
+            "pathParameters": dict(request.path_params),
+            "httpMethod": request.method,
+        }
+    return request.scope["aws.event"]
 
 
 def get_secret_key(aws_client, secret_name, key_name):
