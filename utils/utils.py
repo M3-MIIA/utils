@@ -3,7 +3,7 @@ import os, sys, re, json, logging
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from mangum import Mangum
 
@@ -17,7 +17,7 @@ IS_LOCAL = os.environ.get("ENVIRONMENT") == "local"
 
 
 def config(file=__file__):
-    router = APIRouter()
+    router = FastAPI() if not IS_LOCAL else APIRouter()
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(file)))
     sys.path.insert(0, parent_dir)
     lambda_handler = Mangum(app=router) if not IS_LOCAL else None
