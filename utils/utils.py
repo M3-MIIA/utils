@@ -149,16 +149,17 @@ def parse_body(body):
         raise HTTPException(400, detail={"message":"Invalid request body format","error_code":"bad_request_body_format"})
 
 
-def handle_param_id(param_id):
+def handle_param_id(param_id, param_name='param'):
+    # For INTERGER parameters
 
     if param_id is None:
-        raise HTTPException(400, "Missing param_id")
+        raise HTTPException(400, f"Missing {param_name}_id")
     try:
         param_id = int(param_id)
     except ValueError:
-        raise HTTPException(400, "Invalid param_id format")
+        raise HTTPException(400, f"Invalid {param_name}_id format")
     if param_id.bit_length() > 32:
-        raise HTTPException(400, "Invalid param_id")
+        raise HTTPException(400, f"Invalid {param_name}_id")
 
     return None
 
