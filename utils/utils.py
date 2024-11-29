@@ -153,13 +153,13 @@ def handle_param_id(param_id, param_name='param'):
     # For INTERGER parameters
 
     if param_id is None:
-        raise HTTPException(400, f"Missing {param_name}_id")
+        raise HTTPException(400, f"Missing {param_name}")
     try:
         param_id = int(param_id)
     except ValueError:
-        raise HTTPException(400, f"Invalid {param_name}_id format")
+        raise HTTPException(400, f"Invalid {param_name} format")
     if param_id.bit_length() > 32:
-        raise HTTPException(400, f"Invalid {param_name}_id")
+        raise HTTPException(400, f"Invalid {param_name}")
 
     return None
 
