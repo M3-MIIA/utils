@@ -15,7 +15,7 @@ mangum = "*"
 botocore = "*"
 async-lru = "*"
 dbconn = { git = "https://github.com/M3-MIIA/dbconn.git" }
-PyJWT = "*",
+PyJWT = "*"
 starlette = "*"
 
 [tool.poetry.dev-dependencies]
