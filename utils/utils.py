@@ -6,6 +6,7 @@ from decimal import Decimal
 from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from mangum import Mangum
+from async_lru import alru_cache
 
 from sqlalchemy import text
 from botocore.exceptions import ClientError
@@ -204,6 +205,7 @@ def iam(event):
     return tenant_code
 
 
+@alru_cache
 async def check_tenant(tenant_code, DB):
     sql = """
         INSERT INTO tenant (code)

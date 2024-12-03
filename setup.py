@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="utils",  # Nome do pacote
-    version="0.1.0",  # Versão inicial
+    version="0.1.1",  # Versão do pacote
     description="Utilitários MIIA",
     author="M3-MIIA",
     author_email="ari.oliveira@protonmail.com",
@@ -12,7 +12,8 @@ setup(
         'SQLAlchemy',
         'fastapi',
         'mangum',
-        'botocore'
+        'botocore',
+        'async-lru'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
