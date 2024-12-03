@@ -3,7 +3,7 @@ import os, sys, re, json, logging
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from fastapi import FastAPI, APIRouter, Request, HTTPException
+from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from mangum import Mangum
 
@@ -152,7 +152,7 @@ def parse_body(body):
 def handle_param_id(param_id, param_name='param'):
     # For INTERGER parameters
 
-    if param_id is None:
+    if not param_id:
         raise HTTPException(400, f"Missing {param_name}")
     try:
         param_id = int(param_id)
@@ -161,7 +161,7 @@ def handle_param_id(param_id, param_name='param'):
     if param_id.bit_length() > 32:
         raise HTTPException(400, f"Invalid {param_name}")
 
-    return None
+    return param_id
 
 
 def log_time(label: str, func):
