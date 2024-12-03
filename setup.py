@@ -6,14 +6,15 @@ setup(
     description="Utilitários MIIA",
     author="M3-MIIA",
     author_email="ari.oliveira@protonmail.com",
-    url="https://github.com/M3-MIIA/dbconn",  # URL do projeto
+    url="https://github.com/M3-MIIA/utils",  # URL do projeto
     packages=find_packages(),  # Automaticamente encontra os pacotes Python
     install_requires=[
         'SQLAlchemy',
         'fastapi',
         'mangum',
         'botocore',
-        'async-lru'
+        'async-lru',
+        'dbconn @ git+https://github.com/M3-MIIA/dbconn.git'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

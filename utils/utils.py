@@ -9,7 +9,12 @@ from mangum import Mangum
 from async_lru import alru_cache
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
+
 from botocore.exceptions import ClientError
+
+from dbconn import DB
 
 TENANT_REGEX_PRD = re.compile(r"https://(?P<tenant>.+).miia.tech")
 TENANT_REGEX_HML = re.compile(r"https://.*--m3par-miia.netlify.app")
@@ -238,3 +243,12 @@ def get_secret_key(aws_client, secret_name, key_name):
     except ClientError as e:
         logging.error(f"Erro ao obter o valor do secreto {secret_name}: {e}")
         return
+
+async def get_session():
+    async_session = sessionmaker(
+            bind=DB,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+    async with async_session() as session:
+        yield session
