@@ -14,7 +14,9 @@ setup(
         'mangum',
         'botocore',
         'async-lru',
-        'dbconn @ git+https://github.com/M3-MIIA/dbconn.git'
+        'dbconn @ git+https://github.com/M3-MIIA/dbconn.git',
+        'PyJWT',
+        'starlette'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

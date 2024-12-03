@@ -1,16 +1,20 @@
 import os, sys, re, json, logging
 
+import jwt
+
 from datetime import date, datetime, time
 from decimal import Decimal
 
 from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from mangum import Mangum
-from async_lru import alru_cache
+# from async_lru import alru_cache
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
+
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from botocore.exceptions import ClientError
 
@@ -20,16 +24,6 @@ TENANT_REGEX_PRD = re.compile(r"https://(?P<tenant>.+).miia.tech")
 TENANT_REGEX_HML = re.compile(r"https://.*--m3par-miia.netlify.app")
 
 IS_LOCAL = os.environ.get("ENVIRONMENT") == "local"
-
-
-def config(file=__file__):
-    router = FastAPI() if not IS_LOCAL else APIRouter()
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(file)))
-    sys.path.insert(0, parent_dir)
-    lambda_handler = Mangum(app=router) if not IS_LOCAL else None
-
-    return router, lambda_handler, Request, parent_dir
-
 
 class ErrorResponse(RuntimeError):
     def __init__(self, *args, **kwargs):
@@ -210,7 +204,7 @@ def iam(event):
     return tenant_code
 
 
-@alru_cache
+# @alru_cache
 async def check_tenant(tenant_code, DB):
     sql = """
         INSERT INTO tenant (code)
@@ -252,3 +246,41 @@ async def get_session():
         )
     async with async_session() as session:
         yield session
+
+class JWTMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, secret_key: str, algorithm: str = "HS256"):
+        super().__init__(app)
+        self.secret_key = secret_key
+        self.algorithm = algorithm
+
+    async def dispatch(self, request: Request, call_next):
+        token = request.headers.get("Authorization")
+        if token:
+            try:
+                token = token.split(" ")[1]  # Remove 'Bearer' prefix
+                payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+                request.state.user = payload  # Adiciona o payload ao estado da requisição
+            except jwt.ExpiredSignatureError:
+                return JSONResponse(status_code=401, content={"detail": "Token expired"})
+            except jwt.InvalidTokenError:
+                return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+        else:
+            request.state.user = None
+
+        response = await call_next(request)
+        return response
+   
+
+def config(file=__file__):
+    if not IS_LOCAL:
+        router = FastAPI()    
+        router.add_middleware(JWTMiddleware, secret_key='SECRET_KEY')
+        lambda_handler = Mangum(app=router)
+    else:
+        router = APIRouter()
+        lambda_handler = None
+
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(file)))
+    sys.path.insert(0, parent_dir)
+
+    return router, lambda_handler, Request, parent_dir
