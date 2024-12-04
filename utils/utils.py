@@ -8,7 +8,8 @@ from decimal import Decimal
 from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from mangum import Mangum
-# from async_lru import alru_cache
+
+from async_lru import alru_cache
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -175,11 +176,8 @@ def log_time(label: str, func):
     return ret
 
 
-# Para funcoes async
-async def log_time(label: str, func):
+async def a_log_time(label: str, func):
     from time import time
-
-    # if label =
 
     start = time()
     ret = await func()
@@ -204,7 +202,7 @@ def iam(event):
     return tenant_code
 
 
-# @alru_cache
+@alru_cache
 async def check_tenant(tenant_code, DB):
     sql = """
         INSERT INTO tenant (code)
