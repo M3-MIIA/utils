@@ -282,3 +282,10 @@ def config(file=__file__):
     sys.path.insert(0, parent_dir)
 
     return router, lambda_handler, Request, parent_dir
+
+
+async def set_schema(tenant_id, session):
+    if tenant_id == 'portal': 
+        await session.execute(text("SET search_path TO public"))
+    else:
+        await session.execute(text(f"SET search_path TO tenant_{tenant_id}"))
