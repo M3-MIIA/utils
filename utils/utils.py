@@ -217,6 +217,20 @@ async def check_tenant(tenant_code, DB):
         return fetchone_to_dict(result)
 
 
+async def check_tenant_session(tenant_code, session):
+    sql = """
+        INSERT INTO tenant (code)
+        VALUES (:tenant_code)
+        ON CONFLICT (code) DO UPDATE
+        SET code = EXCLUDED.code
+        RETURNING id
+    """
+    
+    result = await session.execute(text(sql), {"tenant_code": tenant_code})
+    
+    return fetchone_to_dict(result)
+
+
 async def parse_event(request):
     if IS_LOCAL:
         return {
