@@ -270,9 +270,11 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 def config(file=__file__):
+    ACCESS_TOKEN_SECRET_KEY = 'opaopaMIIA-Clt5EZ&5kTfspMArS_6FaHijphNDeJNFTe0IRE3wY'
+
     if not IS_LOCAL:
         router = FastAPI()    
-        router.add_middleware(JWTMiddleware, secret_key='SECRET_KEY')
+        router.add_middleware(JWTMiddleware, secret_key=ACCESS_TOKEN_SECRET_KEY)
         lambda_handler = Mangum(app=router)
     else:
         router = APIRouter()
