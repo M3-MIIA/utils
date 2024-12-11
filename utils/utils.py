@@ -21,6 +21,15 @@ from botocore.exceptions import ClientError
 
 from dbconn import DB
 
+import boto3
+
+service = os.environ['SERVICE_NAME']
+region_name = os.environ['DEPLOY_AWS_REGION']
+
+# Create a Secrets Manager client
+boto3_session = boto3.session.Session()
+secret_manager_client = boto3_session.client(service_name="secretsmanager", region_name=region_name)
+
 TENANT_REGEX_PRD = re.compile(r"https://(?P<tenant>.+).miia.tech")
 TENANT_REGEX_HML = re.compile(r"https://.*--m3par-miia.netlify.app")
 
@@ -245,6 +254,24 @@ async def get_session():
     async with async_session() as session:
         yield session
 
+def _get_secret():
+    
+    secret_name = f"{service}/jwt-access-key"
+
+    try:
+        get_secret_value_response = secret_manager_client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        # For a list of exceptions thrown, see
+        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+        raise e
+
+    secret = get_secret_value_response["SecretString"]
+
+    if not secret:
+        raise ValueError
+
+    return json.loads(secret)
+
 class JWTMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, secret_key: str, algorithm: str = "HS256"):
         super().__init__(app)
@@ -270,7 +297,7 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 def config(file=__file__):
-    ACCESS_TOKEN_SECRET_KEY = 'opaopaMIIA-Clt5EZ&5kTfspMArS_6FaHijphNDeJNFTe0IRE3wY'
+    ACCESS_TOKEN_SECRET_KEY = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
 
     if not IS_LOCAL:
         router = FastAPI()    
