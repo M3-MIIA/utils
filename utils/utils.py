@@ -255,7 +255,7 @@ async def get_session():
         yield session
 
 def _get_secret():
-    
+
     secret_name = f"{service}/jwt-access-key"
 
     try:
@@ -297,11 +297,12 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 def config(file=__file__):
-    ACCESS_TOKEN_SECRET_KEY = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
 
     if not IS_LOCAL:
-        router = FastAPI()    
-        router.add_middleware(JWTMiddleware, secret_key=ACCESS_TOKEN_SECRET_KEY)
+        router = FastAPI()  
+        if service == 'portal':
+            ACCESS_TOKEN_SECRET_KEY = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
+            router.add_middleware(JWTMiddleware, secret_key=ACCESS_TOKEN_SECRET_KEY)
         lambda_handler = Mangum(app=router)
     else:
         router = APIRouter()
