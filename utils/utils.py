@@ -296,6 +296,7 @@ class JWTMiddleware(BaseHTTPMiddleware):
         return response
    
 
+
 def config(file=__file__):
 
     if not IS_LOCAL:
@@ -308,8 +309,9 @@ def config(file=__file__):
         router = APIRouter()
         lambda_handler = None
 
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(file)))
+    parent_dir = os.path.dirname(os.path.abspath(file))
     sys.path.insert(0, parent_dir)
+    sys.path.insert(0, os.path.dirname(parent_dir))
 
     return router, lambda_handler, Request, parent_dir
 
