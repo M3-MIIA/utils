@@ -245,14 +245,37 @@ def get_secret_key(aws_client, secret_name, key_name):
         logging.error(f"Erro ao obter o valor do secreto {secret_name}: {e}")
         return
 
-async def get_session():
+class SessionFactory:
+    def __init__(self, session):
+        self._session = session
+
+    async def get_session(self, tenant_code):
+        async with self._session.begin():
+            sql = """
+                INSERT INTO tenant (code)
+                VALUES (:tenant_code)
+                ON CONFLICT (code) DO UPDATE 
+                SET code = EXCLUDED.code
+                RETURNING id
+            """
+
+            result = await self._session.execute(text(sql), {"tenant_code": tenant_code})
+            tenant_id = fetchone_to_dict(result)['id']
+            
+            logging.info(f"Connected with tenant: {tenant_id}")
+            
+            return self._session, tenant_id
+
+
+async def session_factory():
     async_session = sessionmaker(
             bind=DB,
             class_=AsyncSession,
             expire_on_commit=False,
         )
+    
     async with async_session() as session:
-        yield session
+        yield SessionFactory(session)
 
 def _get_secret():
 
