@@ -23,6 +23,7 @@ from dbconn import DB
 
 import boto3
 
+
 service = os.environ['SERVICE_NAME']
 region_name = os.environ['DEPLOY_AWS_REGION']
 
@@ -244,6 +245,15 @@ def get_secret_key(aws_client, secret_name, key_name):
     except ClientError as e:
         logging.error(f"Erro ao obter o valor do secreto {secret_name}: {e}")
         return
+    
+    
+def get_ssm_parameter(aws_client, value_name):
+    try:
+        response = aws_client.get_parameter(Name=value_name, WithDecryption=True)
+        return response['Parameter']['Value']
+    except Exception:
+        logging.exception(f"Error retrieving SSM parameter")
+    
 
 async def get_session():
     async_session = sessionmaker(
