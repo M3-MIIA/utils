@@ -234,6 +234,7 @@ async def parse_event(request):
             "queryStringParameters": dict(request.query_params),
             "pathParameters": dict(request.path_params),
             "httpMethod": request.method,
+            "resource": request.scope.get('raw_path')
         }
     return request.scope["aws.event"]
 
