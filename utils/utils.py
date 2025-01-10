@@ -327,7 +327,7 @@ async def set_schema(tenant_id, session):
         await session.execute(text(f"SET search_path TO tenant_{tenant_id}"))
 
 
-def get_secret():
+def get_secret_adm():
 
     secret_name = "adm/jwt-access-key"
     region_name = "us-east-1"
@@ -349,3 +349,8 @@ def get_secret():
         raise e
 
     secret = get_secret_value_response['SecretString']
+    
+    if not secret:
+        raise ValueError
+    
+    return json.loads(secret)
