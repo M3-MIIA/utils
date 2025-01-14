@@ -306,14 +306,14 @@ def config(file=__file__):
         if service == 'portal':
             ACCESS_TOKEN_SECRET_KEY = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
             router.add_middleware(JWTMiddleware, secret_key=ACCESS_TOKEN_SECRET_KEY)
-        lambda_handler = Mangum(app=router)
-    else:
-        router = APIRouter()
         router.add_middleware(CORSMiddleware,
                    allow_origins=['*'],
                    allow_credentials=True,
                    allow_methods=["*"],
                    allow_headers=["*"],)
+        lambda_handler = Mangum(app=router)
+    else:
+        router = APIRouter()
         lambda_handler = None
 
     parent_dir = os.path.dirname(os.path.abspath(file))
