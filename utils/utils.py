@@ -299,11 +299,11 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 
-def config(file=__file__):
+def config(file=__file__,jwt_auth=False):
 
     if not IS_LOCAL:
         router = FastAPI()  
-        if service == 'portal':
+        if jwt_auth:
             ACCESS_TOKEN_SECRET_KEY = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
             router.add_middleware(JWTMiddleware, secret_key=ACCESS_TOKEN_SECRET_KEY)
         router.add_middleware(CORSMiddleware,
