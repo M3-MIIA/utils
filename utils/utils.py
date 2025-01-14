@@ -258,7 +258,7 @@ async def get_session():
 
 def _get_secret():
 
-    secret_name = f"{service}/jwt-access-key"
+    secret_name = f"{service}/jwt-secret"
 
     try:
         get_secret_value_response = secret_manager_client.get_secret_value(SecretId=secret_name)
