@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
 from botocore.exceptions import ClientError
 
@@ -308,6 +309,11 @@ def config(file=__file__):
         lambda_handler = Mangum(app=router)
     else:
         router = APIRouter()
+        router.add_middleware(CORSMiddleware,
+                   allow_origins=['*'],
+                   allow_credentials=True,
+                   allow_methods=["*"],
+                   allow_headers=["*"],)
         lambda_handler = None
 
     parent_dir = os.path.dirname(os.path.abspath(file))
