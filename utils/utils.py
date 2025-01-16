@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
 from botocore.exceptions import ClientError
 
@@ -71,7 +72,7 @@ def to_json(obj):
     if isinstance(obj, (date, datetime, time)):
         return obj.isoformat()
     if isinstance(obj, Decimal):
-        return str(obj)
+        return float(obj)
 
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
@@ -234,6 +235,7 @@ async def parse_event(request):
             "queryStringParameters": dict(request.query_params),
             "pathParameters": dict(request.path_params),
             "httpMethod": request.method,
+            "resource": request.scope.get('path')
         }
     return request.scope["aws.event"]
 
@@ -279,7 +281,7 @@ async def session_factory():
 
 def _get_secret():
 
-    secret_name = f"{service}/jwt-access-key"
+    secret_name = f"{service}/jwt-secret"
 
     try:
         get_secret_value_response = secret_manager_client.get_secret_value(SecretId=secret_name)
@@ -320,13 +322,18 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 
-def config(file=__file__):
+def config(file=__file__,jwt_auth=False):
 
     if not IS_LOCAL:
         router = FastAPI()  
-        if service == 'portal':
+        if jwt_auth:
             ACCESS_TOKEN_SECRET_KEY = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
             router.add_middleware(JWTMiddleware, secret_key=ACCESS_TOKEN_SECRET_KEY)
+        router.add_middleware(CORSMiddleware,
+                   allow_origins=['*'],
+                   allow_credentials=True,
+                   allow_methods=["*"],
+                   allow_headers=["*"],)
         lambda_handler = Mangum(app=router)
     else:
         router = APIRouter()
