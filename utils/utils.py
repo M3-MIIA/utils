@@ -72,7 +72,7 @@ def to_json(obj):
     if isinstance(obj, (date, datetime, time)):
         return obj.isoformat()
     if isinstance(obj, Decimal):
-        return str(obj)
+        return float(obj)
 
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
