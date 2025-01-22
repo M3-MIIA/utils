@@ -281,7 +281,7 @@ async def session_factory():
 
 def _get_secret():
 
-    secret_name = f"{service}/jwt-secret"
+    secret_name = f"{service}/jwt-access-key"
 
     try:
         get_secret_value_response = secret_manager_client.get_secret_value(SecretId=secret_name)
@@ -315,7 +315,7 @@ class JWTMiddleware(BaseHTTPMiddleware):
             except jwt.InvalidTokenError:
                 return JSONResponse(status_code=401, content={"detail": "Invalid token"})
         else:
-            request.state.user = None
+            return JSONResponse(status_code=401, content={"detail": "Missing Authorization Credentials"})
 
         response = await call_next(request)
         return response
