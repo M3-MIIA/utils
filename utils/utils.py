@@ -299,13 +299,14 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 
-def config(jwt_auth=False):
+def config(jwt_auth=False,acess_token_secret_key=None):
 
     if not IS_LOCAL:
         router = FastAPI()  
         if jwt_auth:
-            ACCESS_TOKEN_SECRET_KEY = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
-            router.add_middleware(JWTMiddleware, secret_key=ACCESS_TOKEN_SECRET_KEY)
+            if not acess_token_secret_key:
+                acess_token_secret_key = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
+            router.add_middleware(JWTMiddleware, secret_key=acess_token_secret_key)
         router.add_middleware(CORSMiddleware,
                    allow_origins=['*'],
                    allow_credentials=True,
