@@ -299,7 +299,7 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 
-def config(file=__file__,jwt_auth=False):
+def config(jwt_auth=False):
 
     if not IS_LOCAL:
         router = FastAPI()  
@@ -316,11 +316,8 @@ def config(file=__file__,jwt_auth=False):
         router = APIRouter()
         lambda_handler = None
 
-    parent_dir = os.path.dirname(os.path.abspath(file))
-    sys.path.insert(0, parent_dir)
-    sys.path.insert(0, os.path.dirname(parent_dir))
 
-    return router, lambda_handler, Request, parent_dir
+    return router, lambda_handler
 
 
 async def set_schema(tenant_id, session):
