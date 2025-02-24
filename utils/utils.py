@@ -18,6 +18,8 @@ from sqlalchemy.orm import sessionmaker
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
+from pydantic import ValidationError
+
 from botocore.exceptions import ClientError
 
 from dbconn import DB
@@ -322,28 +324,57 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 
-def config(file=__file__,jwt_auth=False):
+def config(file=__file__, jwt_auth=False, acess_token_secret_key=None):
+    # Aviso de depreciação para 'file'
+    if file is not __file__:
+        warnings.warn(
+            "O parâmetro 'file' será removido em futuras versões. Ele não é mais necessário.",
+            DeprecationWarning,
+            stacklevel=2
+        )
 
     if not IS_LOCAL:
         router = FastAPI()  
         if jwt_auth:
-            ACCESS_TOKEN_SECRET_KEY = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
-            router.add_middleware(JWTMiddleware, secret_key=ACCESS_TOKEN_SECRET_KEY)
+            if not acess_token_secret_key:
+                acess_token_secret_key = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
+            router.add_middleware(JWTMiddleware, secret_key=acess_token_secret_key)
         router.add_middleware(CORSMiddleware,
                    allow_origins=['*'],
                    allow_credentials=True,
                    allow_methods=["*"],
                    allow_headers=["*"],)
+
+        @app.exception_handler(Exception)
+        async def global_exception_handler(request: Request, exc: Exception):
+            logging.error(f"Server error occurred: {exc}")
+            return JSONResponse(
+                status_code=500,
+                content={"message": "Internal server error.", "error_code": "internal_server_error"},
+            )
+        
+        @app.middleware("http")
+        async def custom_middleware(request: Request, call_next):
+            try:
+                response = await call_next(request)  # Processa a requisição
+                return response
+            except ValidationError as exc:
+                logging.error(f"Erro de validação (APIRouter): {exc}")
+                return JSONResponse(
+                    status_code=422,
+                    content={
+                        "errors": exc.errors(),
+                        "error_code": "invalid_field_value",
+                        "message": "Invalid request body format"
+                    }
+                )
         lambda_handler = Mangum(app=router)
     else:
         router = APIRouter()
         lambda_handler = None
 
-    parent_dir = os.path.dirname(os.path.abspath(file))
-    sys.path.insert(0, parent_dir)
-    sys.path.insert(0, os.path.dirname(parent_dir))
 
-    return router, lambda_handler, Request, parent_dir
+    return router, lambda_handler
 
 
 async def set_schema(tenant_id, session):
