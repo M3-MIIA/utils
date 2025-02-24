@@ -301,7 +301,14 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 
-def config(jwt_auth=False,acess_token_secret_key=None):
+def config(file=__file__, jwt_auth=False, acess_token_secret_key=None):
+    # Aviso de depreciação para 'file'
+    if file is not __file__:
+        warnings.warn(
+            "O parâmetro 'file' será removido em futuras versões. Ele não é mais necessário.",
+            DeprecationWarning,
+            stacklevel=2
+        )
 
     if not IS_LOCAL:
         router = FastAPI()  
