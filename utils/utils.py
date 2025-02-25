@@ -1,15 +1,13 @@
-import os, sys, re, json, logging
+import os, re, json, logging
 
 import jwt
 
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from mangum import Mangum
-
-from async_lru import alru_cache
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,13 +35,6 @@ TENANT_REGEX_PRD = re.compile(r"https://(?P<tenant>.+).miia.tech")
 TENANT_REGEX_HML = re.compile(r"https://.*--m3par-miia.netlify.app")
 
 IS_LOCAL = os.environ.get("ENVIRONMENT") == "local"
-
-class ErrorResponse(RuntimeError):
-    def __init__(self, *args, **kwargs):
-        resp = make_error_response(*args, **kwargs)
-        self.response = resp
-
-        super().__init__(f"{resp['statusCode']} {resp.get('body', '-')}")
 
 
 def echo_request(event):
@@ -77,77 +68,6 @@ def to_json(obj):
         return float(obj)
 
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-
-
-def make_response(status_code, body=None):
-    headers = {"Access-Control-Allow-Origin": "*"}
-
-    response = {"statusCode": status_code, "headers": headers}
-
-    if body:
-        headers["Content-Type"] = "application/json"
-        response["body"] = json.dumps(body, default=to_json)
-
-    return response
-
-
-def make_error_response(
-    status_code,
-    message,
-    extra_fields={},
-    *,
-    error_code: str = None,
-    details: str = None,
-):
-    """
-    Create an error response object using the same format as the AWS API Gateway
-    errors (return the error in a 'message' field).
-    """
-
-    extra_fields = extra_fields.copy()
-
-    if error_code is not None:
-        extra_fields["error_code"] = error_code
-    if details is not None:
-        extra_fields["details"] = details
-
-    return make_response(status_code, {"message": message, **extra_fields})
-
-
-def get_tenant_id_from_headers(
-    http_headers: dict,
-) -> tuple[str, None] | tuple[None, dict]:
-    """
-    Use the tenant ID from the `X-Tenant-Id` HTTP request header (if given) or
-    derive it from the URL in the `Origin` header.
-
-    On success, return the tenant ID and None.
-
-    If none of those headers are given, or if the URL in the `Origin` header
-    doesn't match the expected platform domains, return None and an error
-    response.
-    """
-
-    tenant_id = http_headers.get("x-tenant-id")
-    if tenant_id is not None:
-        return tenant_id, None
-
-    origin = http_headers.get("origin")
-    if origin is None:
-        return None, make_error_response(400, "Missing origin header")
-
-    match = TENANT_REGEX_PRD.match(origin)
-    if match:
-        tenant_id = match.group("tenant")
-        return tenant_id, None
-
-    match = TENANT_REGEX_HML.match(origin)
-    if match:
-        # Assume test deploys that don't send the X-Tenant-Id header as
-        # belonging to the portal tenant.
-        return "portal", None
-
-    return None, make_error_response(400, "Invalid url")
 
 
 def parse_body(body):
@@ -214,26 +134,15 @@ def iam(event):
     return tenant_code
 
 
-@alru_cache
-async def check_tenant(tenant_code, DB):
-    sql = """
-        INSERT INTO tenant (code)
-        VALUES (:tenant_code)
-        ON CONFLICT (code) DO UPDATE 
-        SET code = EXCLUDED.code
-        RETURNING id
-    """
-
-    async with DB.begin() as conn:
-        result = await conn.execute(text(sql), {"tenant_code": tenant_code})
-        return fetchone_to_dict(result)
-
-
 async def parse_event(request):
     if IS_LOCAL:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
         return {
             "headers": dict(request.headers),
-            "body": await request.body(),
+            "body": body,
             "queryStringParameters": dict(request.query_params),
             "pathParameters": dict(request.path_params),
             "httpMethod": request.method,
@@ -324,21 +233,13 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 
-def config(file=__file__, jwt_auth=False, acess_token_secret_key=None):
-    # Aviso de depreciação para 'file'
-    if file is not __file__:
-        warnings.warn(
-            "O parâmetro 'file' será removido em futuras versões. Ele não é mais necessário.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-
+def config(jwt_auth=False, access_token_secret_key=None):
     if not IS_LOCAL:
         router = FastAPI()  
         if jwt_auth:
-            if not acess_token_secret_key:
-                acess_token_secret_key = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
-            router.add_middleware(JWTMiddleware, secret_key=acess_token_secret_key)
+            if not access_token_secret_key:
+                access_token_secret_key = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
+            router.add_middleware(JWTMiddleware, secret_key=access_token_secret_key)
         router.add_middleware(CORSMiddleware,
                    allow_origins=['*'],
                    allow_credentials=True,
@@ -356,7 +257,7 @@ def config(file=__file__, jwt_auth=False, acess_token_secret_key=None):
         @app.middleware("http")
         async def custom_middleware(request: Request, call_next):
             try:
-                response = await call_next(request)  # Processa a requisição
+                response = await call_next(request)
                 return response
             except ValidationError as exc:
                 logging.error(f"Erro de validação (APIRouter): {exc}")
