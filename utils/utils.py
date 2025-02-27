@@ -235,12 +235,12 @@ class JWTMiddleware(BaseHTTPMiddleware):
 
 def config(jwt_auth=False, access_token_secret_key=None):
     if not IS_LOCAL:
-        router = FastAPI()  
+        app = FastAPI()  
         if jwt_auth:
             if not access_token_secret_key:
                 access_token_secret_key = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
-            router.add_middleware(JWTMiddleware, secret_key=access_token_secret_key)
-        router.add_middleware(CORSMiddleware,
+            app.add_middleware(JWTMiddleware, secret_key=access_token_secret_key)
+        app.add_middleware(CORSMiddleware,
                    allow_origins=['*'],
                    allow_credentials=True,
                    allow_methods=["*"],
@@ -269,13 +269,13 @@ def config(jwt_auth=False, access_token_secret_key=None):
                         "message": "Invalid request body format"
                     }
                 )
-        lambda_handler = Mangum(app=router)
+        lambda_handler = Mangum(app=app)
     else:
-        router = APIRouter()
+        app = APIRouter()
         lambda_handler = None
 
 
-    return router, lambda_handler
+    return app, lambda_handler
 
 
 async def set_schema(tenant_id, session):
