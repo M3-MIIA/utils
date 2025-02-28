@@ -151,7 +151,10 @@ async def parse_event(request):
         }
     
     aws_event = request.scope["aws.event"]
-    aws_event["body"] = json.loads(aws_event["body"])
+    try:
+        aws_event["body"] = json.loads(aws_event["body"])
+    except Exception:
+        pass
     
     return aws_event
 
