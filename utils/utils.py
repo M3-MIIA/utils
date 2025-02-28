@@ -135,11 +135,12 @@ def iam(event):
 
 
 async def parse_event(request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+        
     if IS_LOCAL:
-        try:
-            body = await request.json()
-        except Exception:
-            body = {}
         return {
             "headers": dict(request.headers),
             "body": body,
