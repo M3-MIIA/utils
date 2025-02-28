@@ -135,12 +135,12 @@ def iam(event):
 
 
 async def parse_event(request):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-        
     if IS_LOCAL:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+            
         return {
             "headers": dict(request.headers),
             "body": body,
@@ -149,7 +149,11 @@ async def parse_event(request):
             "httpMethod": request.method,
             "resource": request.scope.get('path')
         }
-    return request.scope["aws.event"]
+    
+    aws_event = request.scope["aws.event"]
+    aws_event["body"] = json.loads(aws_event["body"])
+    
+    return aws_event
 
 
 def get_secret_key(aws_client, secret_name, key_name):
