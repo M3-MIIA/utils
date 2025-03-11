@@ -179,7 +179,11 @@ class SessionFactory:
             """
         
             result = await self._session.execute(text(sql))
-            return fetchall_to_dict(result)
+            ids = fetchall_to_dict(result)
+
+            logging.info("Connected with DEFAULT")
+            
+            return self._session, ids
         
         async with self._session.begin():
             sql = """
