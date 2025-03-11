@@ -170,21 +170,21 @@ class SessionFactory:
     def __init__(self, session):
         self._session = session
 
-    async def get_session(self, tenant_code=None):
-        if not tenant_code:
-            async with self._session.begin():
-                sql = """
-                SELECT id
+    async def list_tenants(self):
+        async with self._session.begin():
+            sql = """
+                SELECT code
                 FROM tenant
             """
-        
-            result = await self._session.execute(text(sql))
-            ids = fetchall_to_dict(result)
 
-            logging.info("Connected with DEFAULT")
+            result = await self._session.execute(text(sql), {})
+            tenants = fetchall_to_dict(result)
+
+            logging.info("Tenants listed")
             
-            return self._session, ids
+            return [t['code'] for t in tenants]
         
+    async def get_session(self, tenant_code):
         async with self._session.begin():
             sql = """
                 INSERT INTO tenant (code)
@@ -243,7 +243,7 @@ def with_session(func):
     async def new_func(*args, **kwargs):
         async_session = _make_session()
         async with async_session() as session:
-            return await func(*args, **kwargs, session_factory=session)
+            return await func(*args, **kwargs, session_factory=SessionFactory(session))
     return new_func
 
 def _get_secret():
