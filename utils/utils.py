@@ -170,9 +170,17 @@ class SessionFactory:
     def __init__(self, session):
         self._session = session
 
-
     async def get_session(self, tenant_code=None):
         if not tenant_code:
+            async with self._session.begin():
+                sql = """
+                SELECT id
+                FROM tenant
+            """
+        
+            result = await self._session.execute(text(sql))
+            return fetchall_to_dict(result)
+        
         async with self._session.begin():
             sql = """
                 INSERT INTO tenant (code)
