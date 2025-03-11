@@ -170,7 +170,9 @@ class SessionFactory:
     def __init__(self, session):
         self._session = session
 
-    async def get_session(self, tenant_code):
+
+    async def get_session(self, tenant_code=None):
+        if not tenant_code:
         async with self._session.begin():
             sql = """
                 INSERT INTO tenant (code)
@@ -211,7 +213,7 @@ async def session_factory():
     async with async_session() as session:
         yield SessionFactory(session)
 
-def with_section(func):
+def with_session(func):
     """
     Use this function to wrap non-route λ functions (e.g. EventBridge events or
     SQS queue consumers).
@@ -229,7 +231,7 @@ def with_section(func):
     async def new_func(*args, **kwargs):
         async_session = _make_session()
         async with async_session() as session:
-            return func(*args, **kwargs, session=session)
+            return await func(*args, **kwargs, session_factory=session)
     return new_func
 
 def _get_secret():
