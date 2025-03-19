@@ -38,6 +38,14 @@ TENANT_REGEX_HML = re.compile(r"https://.*--m3par-miia.netlify.app")
 IS_LOCAL = os.environ.get("ENVIRONMENT") == "local"
 
 
+def init_logger()
+	"""
+	Should be called in the global scope of the main file.
+	"""
+	log_level = os.environ.get('MIIA_LOG_LEVEL', 'INFO').upper()
+	logging.getLogger().setLevel(log_level)
+
+
 def echo_request(event):
     params = event["queryStringParameters"] or {}
 
