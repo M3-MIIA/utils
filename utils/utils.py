@@ -21,9 +21,11 @@ from pydantic import ValidationError
 
 from botocore.exceptions import ClientError
 
-from dbconn import DB
+from dbconn import connect_to_db
 
 import boto3
+
+DB = connect_to_db()
 
 service = os.environ['SERVICE_NAME']
 region_name = os.environ['DEPLOY_AWS_REGION']

@@ -14,7 +14,7 @@ setup(
         'mangum',
         'botocore',
         'async-lru',
-        'dbconn @ git+https://github.com/M3-MIIA/dbconn.git@v1.0.1',
+        'dbconn @ git+https://github.com/M3-MIIA/dbconn.git@v1.0.3',
         'PyJWT',
         'starlette'
     ],
