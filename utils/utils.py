@@ -28,7 +28,7 @@ import boto3
 DB = connect_to_db()
 
 service = os.environ['SERVICE_NAME']
-region_name = os.environ['AWS_DEFAULT_REGION']
+region_name = os.environ['DEPLOY_AWS_REGION']
 
 # Create a Secrets Manager client
 boto3_session = boto3.session.Session()
