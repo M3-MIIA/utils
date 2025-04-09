@@ -1,20 +1,20 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="utils",  # Nome do pacote
-    version="0.1.1",  # Versão do pacote
+    name="utils",
+    version="0.1.1",
     description="Utilitários MIIA",
     author="M3-MIIA",
     author_email="ari.oliveira@protonmail.com",
-    url="https://github.com/M3-MIIA/utils",  # URL do projeto
-    packages=find_packages(),  # Automaticamente encontra os pacotes Python
+    url="https://github.com/M3-MIIA/utils",
+    packages=find_packages(),
     install_requires=[
         'SQLAlchemy',
         'fastapi',
         'mangum',
         'botocore',
         'async-lru',
-        'dbconn @ git+https://github.com/M3-MIIA/dbconn.git@v1.0.3',
+        'dbconn @ git+https://github.com/M3-MIIA/dbconn.git@v1.0.4',
         'PyJWT',
         'starlette'
     ],
