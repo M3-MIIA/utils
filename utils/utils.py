@@ -18,6 +18,8 @@ from sqlalchemy.orm import sessionmaker
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
+from pydantic import ValidationError
+
 from botocore.exceptions import ClientError
 
 from dbconn import DB
@@ -312,6 +314,30 @@ def config(jwt_auth=False,acess_token_secret_key=None):
                    allow_credentials=True,
                    allow_methods=["*"],
                    allow_headers=["*"],)
+
+        @app.exception_handler(Exception)
+        async def global_exception_handler(request: Request, exc: Exception):
+            logging.error(f"Server error occurred: {exc}")
+            return JSONResponse(
+                status_code=500,
+                content={"message": "Internal server error.", "error_code": "internal_server_error"},
+            )
+        
+        @app.middleware("http")
+        async def custom_middleware(request: Request, call_next):
+            try:
+                response = await call_next(request)  # Processa a requisição
+                return response
+            except ValidationError as exc:
+                logging.error(f"Erro de validação (APIRouter): {exc}")
+                return JSONResponse(
+                    status_code=422,
+                    content={
+                        "errors": exc.errors(),
+                        "error_code": "invalid_field_value",
+                        "message": "Invalid request body format"
+                    }
+                )
         lambda_handler = Mangum(app=router)
     else:
         router = APIRouter()
