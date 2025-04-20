@@ -170,6 +170,20 @@ class SessionFactory:
     def __init__(self, session):
         self._session = session
 
+    async def list_tenants(self):
+        async with self._session.begin():
+            sql = """
+                SELECT code
+                FROM tenant
+            """
+
+            result = await self._session.execute(text(sql), {})
+            tenants = fetchall_to_dict(result)
+
+            logging.info("Tenants listed")
+            
+            return [t['code'] for t in tenants]
+        
     async def get_session(self, tenant_code):
         async with self._session.begin():
             sql = """
@@ -187,16 +201,50 @@ class SessionFactory:
             
             return self._session, tenant_id
 
+def _make_session():
+    return sessionmaker(
+        bind=DB,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
 
 async def session_factory():
-    async_session = sessionmaker(
-            bind=DB,
-            class_=AsyncSession,
-            expire_on_commit=False,
-        )
+    """
+    Use this function as a dependency in FastAPI routes.
+    E.g.:
+    ```
+    @router.get("…")
+    async def root(session: AsyncSession = Depends(session_factory)):
+        session, tenant_id = await session_factory.get_session(tenant_code)
+        async with session.begin():
+            …
+    ```
+    """
+    async_session = _make_session()
     
     async with async_session() as session:
         yield SessionFactory(session)
+
+def with_session(func):
+    """
+    Use this function to wrap non-route λ functions (e.g. EventBridge events or
+    SQS queue consumers).
+    E.g.:
+    ```
+    def main(event, context, session):
+        session, tenant_id = await session_factory.get_session(tenant_code)
+        async with session.begin():
+            …
+    lambda_handler = with_session(main)
+    ```
+    """
+    from functools import wraps
+    @wraps(func)
+    async def new_func(*args, **kwargs):
+        async_session = _make_session()
+        async with async_session() as session:
+            return await func(*args, **kwargs, session_factory=SessionFactory(session))
+    return new_func
 
 def _get_secret():
 
