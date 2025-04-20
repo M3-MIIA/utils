@@ -266,7 +266,7 @@ class SessionFactory:
             result = await self._session.execute(text(sql), {"tenant_code": tenant_code})
             tenant_id = fetchone_to_dict(result)['id']
             
-            logging.info(f"Connected with tenant: {tenant_id}")
+            logging.info(f"Connected with tenant: {tenant_code} - ID: {tenant_id}")
             
             return self._session, tenant_id
 
