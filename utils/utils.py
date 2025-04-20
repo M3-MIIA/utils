@@ -299,13 +299,14 @@ class JWTMiddleware(BaseHTTPMiddleware):
    
 
 
-def config(file=__file__,jwt_auth=False):
+def config(jwt_auth=False,acess_token_secret_key=None):
 
     if not IS_LOCAL:
         router = FastAPI()  
         if jwt_auth:
-            ACCESS_TOKEN_SECRET_KEY = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
-            router.add_middleware(JWTMiddleware, secret_key=ACCESS_TOKEN_SECRET_KEY)
+            if not acess_token_secret_key:
+                acess_token_secret_key = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
+            router.add_middleware(JWTMiddleware, secret_key=acess_token_secret_key)
         router.add_middleware(CORSMiddleware,
                    allow_origins=['*'],
                    allow_credentials=True,
@@ -316,11 +317,8 @@ def config(file=__file__,jwt_auth=False):
         router = APIRouter()
         lambda_handler = None
 
-    parent_dir = os.path.dirname(os.path.abspath(file))
-    sys.path.insert(0, parent_dir)
-    sys.path.insert(0, os.path.dirname(parent_dir))
 
-    return router, lambda_handler, Request, parent_dir
+    return router, lambda_handler
 
 
 async def set_schema(tenant_id, session):
