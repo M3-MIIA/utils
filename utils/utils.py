@@ -176,30 +176,50 @@ class SessionFactory:
                 SELECT code
                 FROM tenant
             """
-
             result = await self._session.execute(text(sql), {})
             tenants = fetchall_to_dict(result)
 
             logging.info("Tenants listed")
             
             return [t['code'] for t in tenants]
+    
+    async def _set_schema(self,tenant_code):
+        if tenant_code == 'portal': 
+            await self._session.execute(text("SET search_path TO public"))
+        else:
+            await self._session.execute(text(f"SET search_path TO tenant_{tenant_code}"))
+
+    async def _get_session_portal(self, tenant_code):
+        await self._set_schema(tenant_code)
+
+        logging.info(f"Connected with tenant: {tenant_code}")
         
+        return self._session, tenant_code
+
+    async def _get_service_session(self, tenant_code):
+        sql = """
+            INSERT INTO tenant (code)
+            VALUES (:tenant_code)
+            ON CONFLICT (code) DO UPDATE 
+            SET code = EXCLUDED.code
+            RETURNING id
+        """
+
+        result = await self._session.execute(text(sql), {"tenant_code": tenant_code})
+        tenant_id = fetchone_to_dict(result)['id']
+        
+        logging.info(f"Connected with tenant: {tenant_code} - ID: {tenant_id}")
+        
+        return self._session, tenant_id
+    
     async def get_session(self, tenant_code):
         async with self._session.begin():
-            sql = """
-                INSERT INTO tenant (code)
-                VALUES (:tenant_code)
-                ON CONFLICT (code) DO UPDATE 
-                SET code = EXCLUDED.code
-                RETURNING id
-            """
-
-            result = await self._session.execute(text(sql), {"tenant_code": tenant_code})
-            tenant_id = fetchone_to_dict(result)['id']
+            if service == 'portal':
+                return await self._get_session_portal(tenant_code)
+            else:
+                return await self._get_service_session(tenant_code)
             
-            logging.info(f"Connected with tenant: {tenant_code} - ID: {tenant_id}")
-            
-            return self._session, tenant_id
+                
 
 def _make_session():
     return sessionmaker(
@@ -332,10 +352,3 @@ def config(jwt_auth=False, access_token_secret_key=None):
 
 
     return app, lambda_handler
-
-
-async def set_schema(tenant_id, session):
-    if tenant_id == 'portal': 
-        await session.execute(text("SET search_path TO public"))
-    else:
-        await session.execute(text(f"SET search_path TO tenant_{tenant_id}"))
