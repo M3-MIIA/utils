@@ -15,6 +15,7 @@ from sqlalchemy.orm import sessionmaker
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 
 from pydantic import ValidationError
 
@@ -329,22 +330,25 @@ def config(jwt_auth=False, access_token_secret_key=None):
                 status_code=500,
                 content={"message": "Internal server error.", "error_code": "internal_server_error"},
             )
-        
-        @app.middleware("http")
-        async def custom_middleware(request: Request, call_next):
-            try:
-                response = await call_next(request)
-                return response
-            except ValidationError as exc:
-                logging.error(f"Erro de validação (APIRouter): {exc}")
-                return JSONResponse(
-                    status_code=422,
-                    content={
-                        "errors": exc.errors(),
-                        "error_code": "invalid_field_value",
-                        "message": "Invalid request body format"
-                    }
-                )
+            
+        @app.exception_handler(RequestValidationError)
+        async def validation_exception_handler(request: Request, exc: RequestValidationError):
+            # EM UM PRIMEIRO MOMENTO ESSE FORMATO SERÁ USADO APENAS NO MIIA-ESSAY
+            if isinstance(exc.errors(), list):
+                for error in exc.errors():
+                    if 'ctx' in error and 'error' in error['ctx']:
+                        error_obj = error['ctx']['error']
+                        if isinstance(error_obj, ValueError) and error_obj.args:
+                            if isinstance(error_obj.args[0], dict):
+                                raise HTTPException(status_code=400, detail=error_obj.args[0])
+                    elif 'msg' in error:
+                        if "{" in error['msg'] and "error_code" in error['msg']:
+                            start_index = error['msg'].find("{")
+                            raise HTTPException(status_code=400, detail=eval(error['msg'][start_index:]))
+                raise HTTPException(status_code=400, detail={"errors": exc.errors(), "message": "Validation error"})
+            raise HTTPException(status_code=422, detail=exc.errors())
+
+
         lambda_handler = Mangum(app=app)
     else:
         app = APIRouter()
