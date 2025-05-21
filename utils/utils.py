@@ -162,9 +162,12 @@ async def parse_event(request):
         }
     
     aws_event = request.scope["aws.event"]
+    aws_event["queryStringParameters"] = {} if aws_event["queryStringParameters"] == None else aws_event["queryStringParameters"]    
+    
     try:
         aws_event["body"] = json.loads(aws_event["body"])
-    except Exception:
+    except Exception as e:
+        print("Error parsing body", str(e))
         pass
     
     return aws_event
