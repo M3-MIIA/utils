@@ -1,6 +1,37 @@
 from asyncio import Semaphore
 from collections.abc import Coroutine
+from contextvars import ContextVar
+import logging
 from os import environ
+
+
+class AsyncTaskLogFilter(logging.Filter):
+    """
+    Add a task ID prefix in log messages for async contexts.
+
+    E.g.:
+    ```
+    # ❶ Install the log filter in the logger:
+    logging.getLogger().addFilter(AsyncTaskLogFilter())
+
+    async def process_job(job):
+        job_id = job["id"]  # E.g.: "1234"
+        AsyncTaskLogFilter.task_id.set(essay_id)  # ❷ Set the current context ID
+
+        # ❸ The ID will be added to all log messages from this async context:
+        logging.info("Job started")  # → "[1234] Job started"
+        …  # Processa o trabalho
+        logging.info(f"Job complete (took {…}s)") # → "[1234] Job complete (took 3s)"
+    ```
+    """
+
+    task_id = ContextVar("task_id", default="")
+
+    def filter(self, record):
+        task_id_ = self.__class__.task_id.get()
+        if task_id_:
+            record.msg = f"[{task_id_}] {record.msg}"
+        return True
 
 
 def _get_default_max_parallel_tasks():
