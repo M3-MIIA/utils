@@ -7,14 +7,15 @@ import boto3
 from ..async_utils import AsyncTaskLogFilter, make_with_semaphore
 
 from .sqs_consumer import _Message, SqsConsumer
-from .sqs_exceptions import SqsAbortExit, SqsBackoffExit, SqsExit
+from .sqs_exceptions import SqsExit
 
 
 logging.getLogger().addFilter(AsyncTaskLogFilter())
 
 
 async def _handle_sqs_exit(consumer: SqsConsumer[_Message], raw_message: dict,
-                           message: _Message, cause: SqsExit | Exception):
+                           message: _Message | None,
+                           cause: SqsExit | Exception):
     try:
         await consumer.handle_sqs_exit(raw_message, message, cause)
     except Exception | SqsExit as e:
@@ -41,12 +42,17 @@ def _delete_sqs_message(consumer: SqsConsumer, message: dict, message_id: str):
         raise
 
 
+def _should_delete_message(exception: Exception | SqsExit | None):
+    if exception is None: return False  # Message processed successfully
+    elif not isinstance(exception, SqsExit): return True  # Unhandled exception
+    else: return exception._delete_message
+
+
 async def _process_sqs_message(consumer: SqsConsumer[_Message],
                                record: dict):
     message_id = record["messageId"]
 
     message = None
-    delete_message = True
     exception = None
 
     AsyncTaskLogFilter.task_id.set(message_id)
@@ -60,13 +66,9 @@ async def _process_sqs_message(consumer: SqsConsumer[_Message],
 
         error_message = "Failed processing SQS message"
         await consumer.process_job(message)
-    except SqsBackoffExit as e:
+    except SqsExit as e:
         exception = e
-        delete_message = False
-        logging.warning(e.compose_message(message_id))
-    except SqsAbortExit as e:
-        exception = e
-        logging.error(e.compose_message(message_id))
+        e.log(message_id)
     except Exception as e:
         exception = e
         e.add_note(f"{error_message} {message_id}")
@@ -75,7 +77,7 @@ async def _process_sqs_message(consumer: SqsConsumer[_Message],
         if exception:
             await _handle_sqs_exit(consumer, record, message, exception)
 
-        if delete_message:
+        if _should_delete_message(exception):
             _delete_sqs_message(consumer, record, message_id)
 
 

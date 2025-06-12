@@ -1,4 +1,9 @@
-class SqsExit(BaseException):
+from abc import ABC, abstractmethod
+import logging
+from typing import override
+
+
+class SqsExit(ABC, BaseException):
     """
     Base class for SqsConsumer exit exceptions.
 
@@ -6,11 +11,59 @@ class SqsExit(BaseException):
     `BaseException`, they won't be caught by `except Exception` blocks.
     """
 
+    _is_error = True
+    _delete_message = True
+
     def __init__(self, *args):
         super().__init__(*args)
 
+    @abstractmethod
+    def log(self, message_id: str | None) -> None:
+        ...
 
-class SqsBackoffExit(SqsExit):
+    def _do_compose_message(self, preamble: str,
+                            log_message: str | None = None,
+                            message_id: str | None = None):
+        msg = preamble
+
+        if message_id: msg += f" {message_id}"
+        if log_message: msg += f": {log_message}"
+
+        return msg
+
+
+class SqsDuplicateMessage(SqsExit):
+    """
+    Stop processing an SQS message that was detected to be a duplicate that has
+    already been processed previously.
+
+    This exception may be raised when the message processing code checks that
+    there is already an output registered in a database associated to the
+    current message from a previous run in order to avoid reprocessing the same
+    data twice or triggering duplicate downstream actions.
+
+    The message will be removed from the queue and no further action will be
+    taken.
+    """
+
+    _is_error = False
+
+    def __init__(self, log_message: str | None = None):
+        self.log_message = log_message
+        msg = self._compose_message()
+        super().__init__(msg)
+
+    @override
+    def log(self, message_id: str | None):
+        msg = self._compose_message(message_id)
+        logging.warning(msg)
+
+    def _compose_message(self, message_id: str | None = None):
+        return self._do_compose_message("Skipping duplicate SQS message",
+                                        message_id, self.log_message)
+
+
+class SqsBackoffMessage(SqsExit):
     """
     Stop processing the SQS message due to a temporary error, but keep it in the
     queue to retry it later.
@@ -22,25 +75,28 @@ class SqsBackoffExit(SqsExit):
     moments.
     """
 
+    _is_error = False
+    _delete_message = False
+
     def __init__(self, log_message: str | None = None):
         self.log_message = log_message
-        msg = self.compose_message()
+        msg = self._compose_message()
         super().__init__(msg)
 
+    @override
+    def log(self, message_id: str | None):
+        msg = self._compose_message(message_id)
+        logging.warning(msg)
 
-    def compose_message(self, message_id: str | None = None):
-        msg = "Backing off SQS message"
-
-        if message_id: msg += f" {message_id}"
-        if self.log_message: msg += f": {self.log_message}"
-
-        return msg
+    def _compose_message(self, message_id: str | None = None):
+        return self._do_compose_message("Backing off SQS message",
+                                        message_id, self.log_message)
 
 
-class SqsAbortExit(SqsExit):
+class SqsAbortMessage(SqsExit):
     """
-    Stop processing the SQS message due to a critical error and delete the
-    message from the queue.
+    Stop processing the SQS message due to a critical unrecoverable error that
+    blocks its processing.
 
     This exception may be raised when a malformed message or an internal code
     failure is detected. The message is removed from the queue, as retrying it
@@ -51,10 +107,10 @@ class SqsAbortExit(SqsExit):
         self.error_code = error_code
         self.error_message = error_message
 
-        msg = self.compose_message()
+        msg = self._compose_message()
         super().__init__(msg)
 
-    def compose_message(self, message_id: str | None = None):
+    def _compose_message(self, message_id: str | None = None):
         if not message_id:
             message_id = ""
 

@@ -4,7 +4,7 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
-from .sqs_exceptions import SqsAbortExit, SqsBackoffExit, SqsExit
+from .sqs_exceptions import SqsAbortMessage, SqsExit
 
 
 _Message = TypeVar("_Message", bound=BaseModel)
@@ -129,12 +129,11 @@ class SqsConsumer(ABC, Generic[_Message]):
                               cause: SqsExit | Exception) -> None:
         if (
             message is None  # Has no message content to match with the error
-            or isinstance(cause, SqsBackoffExit)  # Will try again, it's not the
-                                                  # final state of the message
+            or (isinstance(cause, SqsExit) and not cause._is_error)
         ):
             return  # Don't treat as error
 
-        if isinstance(cause, SqsAbortExit):
+        if isinstance(cause, SqsAbortMessage):
             error_code = cause.error_code
             error_message = cause.error_message
         else:
