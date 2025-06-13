@@ -18,6 +18,12 @@ setup(
         'PyJWT',
         'starlette'
     ],
+    extras_require={
+        'dev': [
+            'pytest',
+            'pytest-aio'
+        ]
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         # "License :: OSI Approved :: MIT License",
