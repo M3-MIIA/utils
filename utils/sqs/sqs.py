@@ -5,12 +5,22 @@ from typing import Iterable, Tuple
 import boto3
 
 from ..async_utils import AsyncTaskLogFilter, make_with_semaphore
+from ..exceptions import ServiceUnavailable
 
 from .sqs_consumer import _Message, SqsConsumer
-from .sqs_exceptions import SqsExit
+from .sqs_exceptions import SqsBackoffMessage, SqsExit
 
 
 logging.getLogger().addFilter(AsyncTaskLogFilter())
+
+
+def _translate_exception(exception: Exception) -> SqsExit | None:
+    try:
+        raise exception
+    except ServiceUnavailable:
+        return SqsBackoffMessage(str(exception))
+    except Exception:
+        return None
 
 
 async def _handle_sqs_exit(consumer: SqsConsumer[_Message], raw_message: dict,
@@ -21,6 +31,12 @@ async def _handle_sqs_exit(consumer: SqsConsumer[_Message], raw_message: dict,
     except Exception | SqsExit as e:
         e.add_note("Exception raised while consumer was handling a previous SQS exit exception")
         raise
+
+
+def _should_delete_message(exception: Exception | SqsExit | None):
+    if exception is None: return True  # Message processed successfully
+    elif not isinstance(exception, SqsExit): return True  # Unhandled exception
+    else: return exception._delete_message
 
 
 _sqs_client = None
@@ -34,18 +50,12 @@ def _delete_sqs_message(consumer: SqsConsumer, message: dict, message_id: str):
 
         _sqs_client.delete_message(
             QueueUrl=consumer.queue_url,
-            ReceiptHandler=message["receiptHandler"]
+            ReceiptHandle=message["receiptHandle"]
         )
     except Exception as e:
         _sqs_client = None  # Force reconnection in next attempt
         e.add_note(f"Failed deleting message {message_id} from SQS queue")
         raise
-
-
-def _should_delete_message(exception: Exception | SqsExit | None):
-    if exception is None: return False  # Message processed successfully
-    elif not isinstance(exception, SqsExit): return True  # Unhandled exception
-    else: return exception._delete_message
 
 
 async def _process_sqs_message(consumer: SqsConsumer[_Message],
@@ -70,9 +80,14 @@ async def _process_sqs_message(consumer: SqsConsumer[_Message],
         exception = e
         e.log(message_id)
     except Exception as e:
-        exception = e
-        e.add_note(f"{error_message} {message_id}")
-        raise  # The exception will be logged by log_unhandled_exceptions()
+        if translated := _translate_exception(e):
+            logging.info(f"Unhandled {type(e)} exception translated to {type(translated)}")
+            exception = translated
+            exception.log(message_id)
+        else:
+            exception = e
+            e.add_note(f"{error_message} {message_id}")
+            raise  # The exception will be logged by log_unhandled_exceptions()
     finally:
         if exception:
             await _handle_sqs_exit(consumer, record, message, exception)
@@ -93,7 +108,7 @@ def _log_unhandled_exceptions(
         msg = f"Unhandled exception raised while processing job {message_id}"
         logging.error(msg, exc_info=exception)
 
-    exceptions = [ r[1] for r in results if isinstance(r[1], Exception) ]
+    exceptions = [ r[1] for r in exceptions if isinstance(r[1], Exception) ]
     raise ExceptionGroup("Unhandled errors in SQS processing",
                          exceptions)
 

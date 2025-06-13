@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from os import environ
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .sqs_exceptions import SqsAbortMessage, SqsExit
 
@@ -18,59 +18,32 @@ class SqsConsumer(ABC, Generic[_Message]):
     the default implementation of other methods (especially
     `handle_sqs_error()`) as needed.
 
-    # Recommended structure
+    The SQS queue URL may be passes in the constructor. If not, it is fetched
+    from the `MIIA_SQS_QUEUE_URL` environment variable.
+
     The recommended way to specify a consumer is:
-    1. Create a function that encapsulates only the business logic, without
-       platform specifics (e.g.: database access). Receive all input as
-       function parameters and return all outputs as function returned values.
-    2. Create a class deriving from `SqsConsumer` and override the methods
-       needed to parse the queue message, fetch any input data needed from data
-       sources like databases and convert them to the business logic function
-       input format (and the other way round to store the function output into
-       the matching data sinks).
+    1. Create a function that encapsulates only the business logic.
+    2. Create a class deriving from `SqsConsumer` and override the
+       `process_job()` method to call the business logic.
     3. Create the SQS queue lambda handler that calls the `process_sqs_messages()`
        function using the `SqsConsumer` created in the previous step.
 
     E.g.:
     ```
     # ❶ Business logic function
-    # --------------------------------------------------------------------------
-    @dataclass
-    class AssessEssayInput:
-        essay_theme: str
-        reference_texts: str
-        essay_text: str
-
-    @dataclasss
-    class AssessEssayOutput:
-        score: decimal
-        remarks: str
-
     def assess_essay(essay: AssessEssayInput) -> AssessEssayOutput:
         […]
 
 
     # ❷ SQS queue message consumer
-    # --------------------------------------------------------------------------
     class AssessEssaySqsMessage(pydantic.BaseModel):
         id: int
-
-    async def fetch_essay_from_db(id: int) -> AssessEssayInput:
-        […]
-
-    async def store_assessment_in_db(id: int,
-                                     assessment: AssessEssayOutput) -> None:
-        […]
-
-    async def store_assessment_error_in_db(id: int, error_code,
-                                           error_message) -> None:
-        […]
 
     class AssessEssaySqsConsumer(SqsConsumer[AssessEssaySqsMessage]):
         @override
         async def process_job(self, message: AssessEssaySqsMessage) -> None:
             input_data = fetch_essay_from_db(message.id)
-            output_data = assess_essay(input_data)  # ⬅️ Call the business logic function
+            output_data = assess_essay(input_data)  # Business logic
             store_assessment_in_db(output_data)
 
         @override
@@ -82,22 +55,21 @@ class SqsConsumer(ABC, Generic[_Message]):
 
 
     # ❸ SQS queue lambda handler
-    # --------------------------------------------------------------------------
     def lambda_handler(event: dict, context):
         loop = asyncio.get_event_loop()
-        sqs_consumer = AssessEssaySqsConsumer()
-        loop.run_until_complete(process_sqs_messages(sqs_consumer, event))
+        sqs_consumer = AssessEssaySqsConsumer()  # Instantiate consumer
+        loop.run_until_complete(
+            process_sqs_messages(sqs_consumer, event)  # Process messages
+        )
     ```
-    Note in the example above how the `assess_essay()` business logic function
-    is isolated from platform details of data sources and sinks. This allows
-    this same function to be called in various contexts, like:
-    1. In unit tests with fixed input data
-    2. In local runs with data read from and written to files in the filesystem
-    3. Queue event handlers with data stored in databases
+
+    More info: [Notion](https://www.notion.so/2119e5d01b7f801aadacf30c91eaaad8)
     """
 
-    def __init__(self, queue_url: str | None = None) -> None:
-        super().__init__()
+    def __init__(self, message_type: type[_Message],
+                 queue_url: str | None = None) -> None:
+        self.message_type = message_type
+
         if queue_url is None:
             queue_url = environ.get("MIIA_SQS_QUEUE_URL")
 
@@ -111,9 +83,22 @@ class SqsConsumer(ABC, Generic[_Message]):
 
 
     def parse_message(self, message: dict) -> _Message:
-        raw_body = message["body"]
-        body = _Message.model_validate_json(raw_body)
-        return body
+        """
+        Parse the received SQS message body.
+
+        The boby is parsed using `model_validate_json()` method from the message
+        model.
+        """
+
+        try:
+            raw_body = message["body"]
+            body = self.message_type.model_validate_json(raw_body)
+            return body
+        except ValidationError:
+            e = SqsAbortMessage("internal_server_error",
+                                "Internal server error")
+            e.add_note("Failed parsing SQS message")
+            raise e
 
 
     def extract_custom_message_id(self, message: _Message) -> str | None:

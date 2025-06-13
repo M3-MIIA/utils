@@ -103,12 +103,19 @@ class SqsAbortMessage(SqsExit):
     would only trigger again the same critical error.
     """
 
-    def __init__(self, error_code: str, error_message: str):
+    def __init__(self, error_code: str, error_message: str,
+                 extra_fields: dict | None = None):
         self.error_code = error_code
         self.error_message = error_message
+        self.extra_fields = extra_fields
 
         msg = self._compose_message()
         super().__init__(msg)
+
+    @override
+    def log(self, message_id: str | None):
+        msg = self._compose_message(message_id)
+        logging.error(msg)
 
     def _compose_message(self, message_id: str | None = None):
         if not message_id:
