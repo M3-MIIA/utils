@@ -121,4 +121,4 @@ class SqsAbortMessage(SqsExit):
         if not message_id:
             message_id = ""
 
-        return f"Aborting SQS message{message_id} due to error {self.error_code}: {self.error_message}"
+        return f"Aborting SQS message {message_id} due to error {self.error_code}: {self.error_message}"
