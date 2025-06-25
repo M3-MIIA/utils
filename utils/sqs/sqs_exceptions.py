@@ -22,8 +22,8 @@ class SqsExit(ABC, BaseException):
         ...
 
     def _do_compose_message(self, preamble: str,
-                            log_message: str | None = None,
-                            message_id: str | None = None):
+                            message_id: str | None = None,
+                            log_message: str | None = None):
         msg = preamble
 
         if message_id: msg += f" {message_id}"
