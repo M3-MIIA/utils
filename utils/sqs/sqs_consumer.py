@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import logging
 from os import environ
 from typing import Generic, TypeVar
 
@@ -94,7 +95,8 @@ class SqsConsumer(ABC, Generic[_Message]):
             raw_body = message["body"]
             body = self.message_type.model_validate_json(raw_body)
             return body
-        except ValidationError:
+        except ValidationError as e:
+            logging.error(f"Failed parsing message body: {e}")
             e = SqsAbortMessage("internal_server_error",
                                 "Internal server error")
             e.add_note("Failed parsing SQS message")
