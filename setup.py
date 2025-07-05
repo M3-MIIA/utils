@@ -15,6 +15,7 @@ setup(
         'boto3 == 1.39.3',
         'dbconn @ git+https://github.com/M3-MIIA/dbconn.git@v1.0.4',
         'PyJWT == 2.10.1',
+        'python-dotenv == 1.1.1',
         'starlette'
     ],
     extras_require={

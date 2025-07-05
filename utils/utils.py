@@ -41,11 +41,24 @@ IS_LOCAL = os.environ.get("ENVIRONMENT") == "local"
 
 
 def init_logger():
-	"""
-	Should be called in the global scope of the main file.
-	"""
-	log_level = os.environ.get('MIIA_LOG_LEVEL', 'INFO').upper()
-	logging.getLogger().setLevel(log_level)
+    """
+    Should be called in the global scope of the main file.
+
+    See also: `init_env()`, which calls `init_logger()` after reading the `.env`
+    file
+    """
+    log_level = os.environ.get('MIIA_LOG_LEVEL', 'INFO').upper()
+    logging.getLogger().setLevel(log_level)
+
+
+def init_env():
+    """
+    Read `.env` files and initialize the environment and logging.
+    """
+
+    from dotenv import load_dotenv
+    load_dotenv()
+    init_logger()
 
 
 def echo_request(event):
@@ -151,7 +164,7 @@ async def parse_event(request):
             body = await request.json()
         except Exception:
             body = {}
-            
+
         return {
             "headers": dict(request.headers),
             "body": body,
@@ -160,16 +173,16 @@ async def parse_event(request):
             "httpMethod": request.method,
             "resource": request.scope.get('path')
         }
-    
+
     aws_event = request.scope["aws.event"]
-    aws_event["queryStringParameters"] = {} if aws_event["queryStringParameters"] == None else aws_event["queryStringParameters"]    
-    
+    aws_event["queryStringParameters"] = {} if aws_event["queryStringParameters"] == None else aws_event["queryStringParameters"]
+
     try:
         aws_event["body"] = json.loads(aws_event["body"])
     except Exception as e:
         print("Error parsing body", str(e))
         pass
-    
+
     return aws_event
 
 
@@ -194,11 +207,11 @@ class SessionFactory:
             tenants = fetchall_to_dict(result)
 
             logging.info("Tenants listed")
-            
+
             return [t['code'] for t in tenants]
-    
+
     async def _set_schema(self,tenant_code):
-        if tenant_code == 'portal': 
+        if tenant_code == 'portal':
             await self._session.execute(text("SET search_path TO public"))
         else:
             await self._session.execute(text(f"SET search_path TO tenant_{tenant_code}"))
@@ -207,33 +220,33 @@ class SessionFactory:
         await self._set_schema(tenant_code)
 
         logging.info(f"Connected with tenant: {tenant_code}")
-        
+
         return self._session, tenant_code
 
     async def _get_service_session(self, tenant_code):
         sql = """
             INSERT INTO tenant (code)
             VALUES (:tenant_code)
-            ON CONFLICT (code) DO UPDATE 
+            ON CONFLICT (code) DO UPDATE
             SET code = EXCLUDED.code
             RETURNING id
         """
 
         result = await self._session.execute(text(sql), {"tenant_code": tenant_code})
         tenant_id = fetchone_to_dict(result)['id']
-        
+
         logging.info(f"Connected with tenant: {tenant_code} - ID: {tenant_id}")
-        
+
         return self._session, tenant_id
-    
+
     async def get_session(self, tenant_code):
         async with self._session.begin():
             if service == 'portal':
                 return await self._get_session_portal(tenant_code)
             else:
                 return await self._get_service_session(tenant_code)
-            
-                
+
+
 
 def _make_session():
     return sessionmaker(
@@ -255,7 +268,7 @@ async def session_factory():
     ```
     """
     async_session = _make_session()
-    
+
     async with async_session() as session:
         yield SessionFactory(session)
 
@@ -320,12 +333,12 @@ class JWTMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
         return response
-   
+
 
 
 def config(jwt_auth=False, access_token_secret_key=None):
     if not IS_LOCAL:
-        app = FastAPI()  
+        app = FastAPI()
         if jwt_auth:
             if not access_token_secret_key:
                 access_token_secret_key = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
@@ -343,7 +356,7 @@ def config(jwt_auth=False, access_token_secret_key=None):
                 status_code=500,
                 content={"message": "Internal server error.", "error_code": "internal_server_error"},
             )
-            
+
         @app.exception_handler(RequestValidationError)
         async def validation_exception_handler(request: Request, exc: RequestValidationError):
             # EM UM PRIMEIRO MOMENTO ESSE FORMATO SERÁ USADO APENAS NO MIIA-ESSAY
