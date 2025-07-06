@@ -14,6 +14,9 @@ from .sqs_exceptions import SqsBackoffMessage, SqsExit
 logging.getLogger().addFilter(AsyncTaskLogFilter())
 
 
+DUMMY_SQS_QUEUE_URL = 'dummy-sqs-queue'
+
+
 def _translate_exception(exception: Exception) -> SqsExit | None:
     try:
         raise exception
@@ -43,6 +46,10 @@ _sqs_client = None
 
 def _delete_sqs_message(consumer: SqsConsumer, message: dict, message_id: str):
     global _sqs_client
+
+    if consumer.queue_url == DUMMY_SQS_QUEUE_URL:
+        logging.warning(f"Using dummy SQS queue, skipping message {message_id} delete")
+        return
 
     try:
         if _sqs_client is None:
