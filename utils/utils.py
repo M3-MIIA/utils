@@ -21,23 +21,58 @@ from pydantic import ValidationError
 
 from botocore.exceptions import ClientError
 
-from dbconn import connect_to_db
-
 import boto3
 
-DB = connect_to_db()
 
-service = os.environ['SERVICE_NAME']
-region_name = os.environ['DEPLOY_AWS_REGION']
+class _InitOnFirstUse:
+    """
+    Proxy class to initialize an object on its first use.
 
-# Create a Secrets Manager client
-boto3_session = boto3.session.Session()
-secret_manager_client = boto3_session.client(service_name="secretsmanager", region_name=region_name)
+    The `init` function given in the constructor is called when the first class
+    member is accessed. E.g.:
+    ```
+    def _init_db():
+        from dbconn import connect_to_db
+        return connect_to_db()
+
+    DB = _InitOnFirstUse(_init_db)
+
+    with DB.begin():  # Access to `begin` member will trigger `init`
+        ...
+    ```
+    """
+
+    def __init__(self, init):
+        self._obj = None
+        self._init = init
+
+    def __getattr__(self, name: str):
+        if self._obj is None:  # Init on first use
+            self._obj = self._init()
+
+        return getattr(self._obj, name)
+
+def _init_db():
+    from dbconn import connect_to_db
+    return connect_to_db()
+
+DB = _InitOnFirstUse(_init_db)
+
+def _init_secrets_manager_client():
+    region_name = os.environ['DEPLOY_AWS_REGION']
+
+    # Create a Secrets Manager client
+    boto3_session = boto3.session.Session()
+    return boto3_session.client(service_name="secretsmanager", region_name=region_name)
+
+secret_manager_client = _InitOnFirstUse(_init_secrets_manager_client)
 
 TENANT_REGEX_PRD = re.compile(r"https://(?P<tenant>.+).miia.tech")
 TENANT_REGEX_HML = re.compile(r"https://.*--m3par-miia.netlify.app")
 
-IS_LOCAL = os.environ.get("ENVIRONMENT") == "local"
+def is_local():
+    env = os.environ.get("ENVIRONMENT")
+    return env == "local"
 
 
 def echo_request(event):
@@ -138,7 +173,7 @@ def iam(event):
 
 
 async def parse_event(request):
-    if IS_LOCAL:
+    if is_local():
         try:
             body = await request.json()
         except Exception:
@@ -220,7 +255,7 @@ class SessionFactory:
 
     async def get_session(self, tenant_code):
         async with self._session.begin():
-            if service == 'portal':
+            if os.environ['SERVICE_NAME'] == 'portal':
                 return await self._get_session_portal(tenant_code)
             else:
                 return await self._get_service_session(tenant_code)
@@ -273,7 +308,7 @@ def with_session(func):
     return new_func
 
 def _get_secret():
-
+    service = os.environ['SERVICE_NAME']
     secret_name = f"{service}/jwt-access-key"
 
     try:
@@ -316,7 +351,7 @@ class JWTMiddleware(BaseHTTPMiddleware):
 
 
 def config(jwt_auth=False, access_token_secret_key=None):
-    if not IS_LOCAL:
+    if not is_local():
         app = FastAPI()
         if jwt_auth:
             if not access_token_secret_key:
