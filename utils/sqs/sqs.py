@@ -31,7 +31,7 @@ async def _handle_sqs_exit(consumer: SqsConsumer[_Message], raw_message: dict,
                            cause: SqsExit | Exception):
     try:
         await consumer.handle_sqs_exit(raw_message, message, cause)
-    except Exception | SqsExit as e:
+    except (Exception, SqsExit) as e:
         e.add_note("Exception raised while consumer was handling a previous SQS exit exception")
         raise
 
