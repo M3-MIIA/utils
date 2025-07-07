@@ -9,19 +9,19 @@ setup(
     url="https://github.com/M3-MIIA/utils",
     packages=find_packages(),
     install_requires=[
-        'SQLAlchemy',
-        'fastapi',
-        'mangum',
-        'botocore',
-        'async-lru',
+        'SQLAlchemy == 2.0.41',
+        'fastapi == 0.115.14',
+        'mangum == 0.19.0',
+        'boto3 == 1.39.3',
         'dbconn @ git+https://github.com/M3-MIIA/dbconn.git@v1.0.4',
-        'PyJWT',
+        'PyJWT == 2.10.1',
+        'python-dotenv == 1.1.1',
         'starlette'
     ],
     extras_require={
         'dev': [
-            'pytest',
-            'pytest-aio'
+            'pytest == 8.4.1',
+            'pytest-aio == 1.9.0'
         ]
     },
     classifiers=[

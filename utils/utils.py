@@ -21,31 +21,58 @@ from pydantic import ValidationError
 
 from botocore.exceptions import ClientError
 
-from dbconn import connect_to_db
-
 import boto3
 
-DB = connect_to_db()
 
-service = os.environ['SERVICE_NAME']
-region_name = os.environ['DEPLOY_AWS_REGION']
+class _InitOnFirstUse:
+    """
+    Proxy class to initialize an object on its first use.
 
-# Create a Secrets Manager client
-boto3_session = boto3.session.Session()
-secret_manager_client = boto3_session.client(service_name="secretsmanager", region_name=region_name)
+    The `init` function given in the constructor is called when the first class
+    member is accessed. E.g.:
+    ```
+    def _init_db():
+        from dbconn import connect_to_db
+        return connect_to_db()
+
+    DB = _InitOnFirstUse(_init_db)
+
+    with DB.begin():  # Access to `begin` member will trigger `init`
+        ...
+    ```
+    """
+
+    def __init__(self, init):
+        self._obj = None
+        self._init = init
+
+    def __getattr__(self, name: str):
+        if self._obj is None:  # Init on first use
+            self._obj = self._init()
+
+        return getattr(self._obj, name)
+
+def _init_db():
+    from dbconn import connect_to_db
+    return connect_to_db()
+
+DB = _InitOnFirstUse(_init_db)
+
+def _init_secrets_manager_client():
+    region_name = os.environ['DEPLOY_AWS_REGION']
+
+    # Create a Secrets Manager client
+    boto3_session = boto3.session.Session()
+    return boto3_session.client(service_name="secretsmanager", region_name=region_name)
+
+secret_manager_client = _InitOnFirstUse(_init_secrets_manager_client)
 
 TENANT_REGEX_PRD = re.compile(r"https://(?P<tenant>.+).miia.tech")
 TENANT_REGEX_HML = re.compile(r"https://.*--m3par-miia.netlify.app")
 
-IS_LOCAL = os.environ.get("ENVIRONMENT") == "local"
-
-
-def init_logger():
-	"""
-	Should be called in the global scope of the main file.
-	"""
-	log_level = os.environ.get('MIIA_LOG_LEVEL', 'INFO').upper()
-	logging.getLogger().setLevel(log_level)
+def is_local():
+    env = os.environ.get("ENVIRONMENT")
+    return env == "local"
 
 
 def echo_request(event):
@@ -146,12 +173,12 @@ def iam(event):
 
 
 async def parse_event(request):
-    if IS_LOCAL:
+    if is_local():
         try:
             body = await request.json()
         except Exception:
             body = {}
-            
+
         return {
             "headers": dict(request.headers),
             "body": body,
@@ -160,16 +187,16 @@ async def parse_event(request):
             "httpMethod": request.method,
             "resource": request.scope.get('path')
         }
-    
+
     aws_event = request.scope["aws.event"]
-    aws_event["queryStringParameters"] = {} if aws_event["queryStringParameters"] == None else aws_event["queryStringParameters"]    
-    
+    aws_event["queryStringParameters"] = {} if aws_event["queryStringParameters"] == None else aws_event["queryStringParameters"]
+
     try:
         aws_event["body"] = json.loads(aws_event["body"])
     except Exception as e:
         print("Error parsing body", str(e))
         pass
-    
+
     return aws_event
 
 
@@ -194,11 +221,11 @@ class SessionFactory:
             tenants = fetchall_to_dict(result)
 
             logging.info("Tenants listed")
-            
+
             return [t['code'] for t in tenants]
-    
+
     async def _set_schema(self,tenant_code):
-        if tenant_code == 'portal': 
+        if tenant_code == 'portal':
             await self._session.execute(text("SET search_path TO public"))
         else:
             await self._session.execute(text(f"SET search_path TO tenant_{tenant_code}"))
@@ -207,33 +234,33 @@ class SessionFactory:
         await self._set_schema(tenant_code)
 
         logging.info(f"Connected with tenant: {tenant_code}")
-        
+
         return self._session, tenant_code
 
     async def _get_service_session(self, tenant_code):
         sql = """
             INSERT INTO tenant (code)
             VALUES (:tenant_code)
-            ON CONFLICT (code) DO UPDATE 
+            ON CONFLICT (code) DO UPDATE
             SET code = EXCLUDED.code
             RETURNING id
         """
 
         result = await self._session.execute(text(sql), {"tenant_code": tenant_code})
         tenant_id = fetchone_to_dict(result)['id']
-        
+
         logging.info(f"Connected with tenant: {tenant_code} - ID: {tenant_id}")
-        
+
         return self._session, tenant_id
-    
+
     async def get_session(self, tenant_code):
         async with self._session.begin():
-            if service == 'portal':
+            if os.environ['SERVICE_NAME'] == 'portal':
                 return await self._get_session_portal(tenant_code)
             else:
                 return await self._get_service_session(tenant_code)
-            
-                
+
+
 
 def _make_session():
     return sessionmaker(
@@ -255,7 +282,7 @@ async def session_factory():
     ```
     """
     async_session = _make_session()
-    
+
     async with async_session() as session:
         yield SessionFactory(session)
 
@@ -281,7 +308,7 @@ def with_session(func):
     return new_func
 
 def _get_secret():
-
+    service = os.environ['SERVICE_NAME']
     secret_name = f"{service}/jwt-access-key"
 
     try:
@@ -320,12 +347,12 @@ class JWTMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
         return response
-   
+
 
 
 def config(jwt_auth=False, access_token_secret_key=None):
-    if not IS_LOCAL:
-        app = FastAPI()  
+    if not is_local():
+        app = FastAPI()
         if jwt_auth:
             if not access_token_secret_key:
                 access_token_secret_key = _get_secret()["ACCESS_TOKEN_SECRET_KEY"]
@@ -343,7 +370,7 @@ def config(jwt_auth=False, access_token_secret_key=None):
                 status_code=500,
                 content={"message": "Internal server error.", "error_code": "internal_server_error"},
             )
-            
+
         @app.exception_handler(RequestValidationError)
         async def validation_exception_handler(request: Request, exc: RequestValidationError):
             # EM UM PRIMEIRO MOMENTO ESSE FORMATO SERÁ USADO APENAS NO MIIA-ESSAY
