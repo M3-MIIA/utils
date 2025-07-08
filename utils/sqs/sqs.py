@@ -5,10 +5,10 @@ from typing import Iterable, Tuple
 import boto3
 
 from ..async_utils import AsyncTaskLogFilter, make_with_semaphore
-from ..exceptions import ServiceUnavailable
+from ..exceptions import MiiaError, ServiceUnavailable
 
 from .sqs_consumer import _Message, SqsConsumer
-from .sqs_exceptions import SqsBackoffMessage, SqsExit
+from .sqs_exceptions import SqsAbortMessage, SqsBackoffMessage, SqsExit
 
 
 logging.getLogger().addFilter(AsyncTaskLogFilter())
@@ -22,6 +22,8 @@ def _translate_exception(exception: Exception) -> SqsExit | None:
         raise exception
     except ServiceUnavailable:
         return SqsBackoffMessage(str(exception))
+    except MiiaError as e:
+        return SqsAbortMessage(e.error_code, e.message)
     except Exception:
         return None
 
