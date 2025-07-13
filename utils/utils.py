@@ -396,3 +396,44 @@ def config(jwt_auth=False, access_token_secret_key=None):
 
 
     return app, lambda_handler
+
+
+def serverless_warmup(func):
+    """
+    Decorator for lambda functions which use the Serverless Warmup Plugin to
+    avoid cold starts.
+
+    This decorator handles warmup invocations and return preemptively without
+    running the actual function code as it is not a legit execution invocation.
+    Only an INFO-level log entry is created for warmup invocations.
+
+    Decorate the handler Python function that is the entrypoint of the lambda
+    function with this decorator:
+    ```
+    # Standard handler function:
+    @serverless_warmup
+    def lambda_handler(event, context):
+        ...  # Function logic
+
+
+    # Mangum APIs:
+    app = FastAPI()
+
+    @app.get("/")
+    def get_root():
+        ...  # Route logic
+
+    handler = serverless_warmup(Mangum(app))
+    ```
+
+    More info: https://www.serverless.com/plugins/serverless-plugin-warmup#on-the-function-side
+    """
+
+    def serverless_warmup_wrapper(event, context):
+        if event.get("source") == "serverless-plugin-warmup":
+            logging.info("Serverless warmup plugin invocation, nothing to do")
+            return {}
+        else:
+            return func(event, context)
+
+    return serverless_warmup_wrapper
