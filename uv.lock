@@ -135,7 +135,7 @@ wheels = [
 [[package]]
 name = "miia-dbconn"
 version = "0.1.0"
-source = { git = "https://github.com/M3-MIIA/dbconn.git?rev=uv#f145d19f4699fdb93defa602cf6207e9d492b3d0" }
+source = { git = "https://github.com/M3-MIIA/dbconn.git?rev=v1.0.5#590299cd13997665b349821e88ed4ea98e8405b7" }
 dependencies = [
     { name = "psycopg", extra = ["binary"] },
     { name = "sqlalchemy" },
@@ -170,7 +170,7 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'full'", specifier = "~=1.39.3" },
     { name = "fastapi", specifier = "~=0.115.14" },
     { name = "mangum", specifier = "~=0.19.0" },
-    { name = "miia-dbconn", git = "https://github.com/M3-MIIA/dbconn.git?rev=uv" },
+    { name = "miia-dbconn", git = "https://github.com/M3-MIIA/dbconn.git?rev=v1.0.5" },
     { name = "pyjwt", specifier = "~=2.10.1" },
     { name = "python-dotenv", specifier = "~=1.1.1" },
     { name = "sqlalchemy", specifier = "~=2.0.41" },
