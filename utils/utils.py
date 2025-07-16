@@ -59,11 +59,9 @@ def _init_db():
 DB = _InitOnFirstUse(_init_db)
 
 def _init_secrets_manager_client():
-    region_name = os.environ['DEPLOY_AWS_REGION']
-
     # Create a Secrets Manager client
     boto3_session = boto3.session.Session()
-    return boto3_session.client(service_name="secretsmanager", region_name=region_name)
+    return boto3_session.client(service_name="secretsmanager")
 
 secret_manager_client = _InitOnFirstUse(_init_secrets_manager_client)
 
