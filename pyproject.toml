@@ -30,6 +30,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["utils"]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.uv.sources]
 miia-dbconn = { git = "https://github.com/M3-MIIA/dbconn.git", rev = "v1.0.5" }
 
